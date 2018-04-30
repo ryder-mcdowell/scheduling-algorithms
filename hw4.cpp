@@ -25,7 +25,7 @@ public:
 void checkInputArgs(int argc, char **argv);
 Input storeInputArgs(int argc, char **argv);
 void firstComeFirstServe();
-multimap <int, Process> getProcessesInput();
+multimap <int, Process> mapProcessesInputBy(const char *key);
 void outputStats(int throughput, int total_wait_time, int time_passed, int remaining_tasks);
 
 
@@ -81,7 +81,7 @@ Input storeInputArgs(int argc, char **argv) {
 
 //first-come first-serve algorithm
 void firstComeFirstServe() {
-  multimap <int, Process> processMultimap = getProcessesInput();
+  multimap <int, Process> processMultimap = mapProcessesInputBy("arrival_time");
   queue <Process> processQueue;
 
   //pull processes from multimap into queue
@@ -123,7 +123,7 @@ void firstComeFirstServe() {
 }
 
 //stores and returns process info from cin into a multimap
-multimap <int, Process> getProcessesInput() {
+multimap <int, Process> mapProcessesInputBy(const char *key) {
   vector <int> v;
   multimap <int, Process> processes;
 
@@ -133,7 +133,7 @@ multimap <int, Process> getProcessesInput() {
     v.push_back(tmp);
   }
 
-  //every third element of vector, take 3 previous elements, create object, and store in multimap by arrival_time
+  //every third element of vector, take 3 previous elements, create object, and store in multimap
   for (int i = 1; i <= v.size(); i++) {
     if (i % 3 == 0) {
       Process p;
@@ -141,7 +141,12 @@ multimap <int, Process> getProcessesInput() {
       p.process_id = v[i - 3];
       p.arrival_time = v[i - 2];
       p.burst_time = v[i - 1];
-      processes.insert(pair <int, Process> (p.arrival_time, p));
+      //map based on key provided by function parameter (for different sorts based on algorithm)
+      if (!strcmp(key, "arrival_time")) {
+        processes.insert(pair <int, Process> (p.arrival_time, p));
+      } else if (!strcmp(key, "burst_time")) {
+        processes.insert(pair <int, Process> (p.burst_time, p));
+      }
     }
   }
 
