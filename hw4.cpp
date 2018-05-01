@@ -25,7 +25,7 @@ public:
 void checkInputArgs(int argc, char **argv);
 Input storeInputArgs(int argc, char **argv);
 void firstComeFirstServe();
-multimap <int, Process> mapProcessesInputBy(const char *key);
+multimap <int, Process> mapProcessInputBy(const char *key);
 void outputStats(int throughput, int total_wait_time, int time_passed, int remaining_tasks);
 
 
@@ -81,39 +81,26 @@ Input storeInputArgs(int argc, char **argv) {
 
 //first-come first-serve algorithm
 void firstComeFirstServe() {
-  multimap <int, Process> processMultimap = mapProcessesInputBy("arrival_time");
-  queue <Process> processQueue;
-
-  //pull processes from multimap into queue
-  multimap <int, Process> :: iterator itr;
-  for (itr = processMultimap.begin(); itr != processMultimap.end(); ++itr) {
-    cout << itr->second.process_id << " " << itr->first << itr->second.arrival_time << " " << itr->second.burst_time << '\n';
-    processQueue.push(itr->second);
-  }
+  multimap <int, Process> processMultimap = mapProcessInputBy("arrival_time");
 
   int time_passed = 0;
   int throughput = 0;
   int total_wait_time = 0;
-  //int total_turnaround_time = 0;
-  int remaining_tasks = processQueue.size();
+  int remaining_tasks = processMultimap.size();
 
+  //
+  multimap <int, Process> :: iterator itr;
   fprintf(stderr, "======================================\n");
-  while (processQueue.size() > 0) {
-    //get first in queue
-    Process p = processQueue.front();
+  for (itr = processMultimap.begin(); itr != processMultimap.end(); itr++) {
+    //
+    Process p = itr->second;
     fprintf(stderr, "%7d: Scheduling PID %7d, CPU = %7d\n", time_passed, p.process_id, p.burst_time);
 
-    //do "work"
-    sleep(p.burst_time * 0.1);     //!!!!
-
-    //remove element and add to running totals;
-    processQueue.pop();
+    //
     time_passed += p.burst_time;
     throughput += 1;
     remaining_tasks -=1;
-    if (processQueue.size() >= 1) {
-      total_wait_time += time_passed;
-    }
+    total_wait_time += time_passed;
 
     fprintf(stderr, "%7d:            PID %7d  terminated\n", time_passed, p.process_id);
   }
@@ -123,11 +110,12 @@ void firstComeFirstServe() {
 }
 
 //stores and returns process info from cin into a multimap
-multimap <int, Process> mapProcessesInputBy(const char *key) {
+multimap <int, Process> mapProcessInputBy(const char *key) {
   vector <int> v;
   multimap <int, Process> processes;
 
   //recieve input from stdin and store in vector
+  /////////// while (cin >> x >> y >> z) {}
   int tmp;
   while (cin >> tmp) {
     v.push_back(tmp);
