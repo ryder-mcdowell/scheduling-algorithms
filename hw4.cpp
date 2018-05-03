@@ -87,6 +87,7 @@ void firstComeFirstServe(int sim_time) {
   int time_passed = 0;
   int throughput = 0;
   int total_wait_time = 0;
+  int total_turnaround_time = 0;
   int remaining_tasks = processMultimap.size();
 
   //iterate over multimap
@@ -108,18 +109,68 @@ void firstComeFirstServe(int sim_time) {
     time_passed += p.burst_time;
     throughput += 1;
     remaining_tasks -=1;
-    total_wait_time += time_passed;
+    if (remaining_tasks != 0) {
+      total_wait_time += time_passed;
+    }
 
     fprintf(stderr, "%7d:            PID %7d  terminated\n", time_passed, p.process_id);
   }
   fprintf(stderr, "======================================\n");
-
   outputStats(throughput, total_wait_time, time_passed, remaining_tasks);
 }
 
 //shortest-job first algorithm
 void shortestJobFirst(int sim_time) {
+  multimap <int, Process> processMultimap = mapProcessInputBy("arrival_time");
+  multimap <int, Process> processMultimap2;
 
+  int time_passed = 0;
+  int throughput = 0;
+  int total_wait_time = 0;
+  int remaining_tasks = processMultimap.size();
+
+  //iterate over multimap
+  multimap <int, Process> :: iterator itr;
+  multimap <int, Process> :: iterator itr2;
+  fprintf(stderr, "======================================\n");
+  for (itr = processMultimap.begin(); itr != processMultimap.end(); itr++) {
+    Process p = itr->second;
+    processMultimap2.insert(pair <int, Process> (p.burst_time, p));
+
+    //add all the processes in the first multimap that have the same arrival_time into a second multimap
+    for (int i = 0; i < processMultimap.count(p.arrival_time) - 1; i++) {
+      itr++;
+      Process p = itr->second;
+      processMultimap2.insert(pair <int, Process> (p.burst_time, p));
+    }
+
+    //iterate over all elements in second multimap
+    for (itr2 = processMultimap2.begin(); itr2 != processMultimap2.end(); itr2++) {
+      //get next process "in queue"
+      Process p = itr2->second;
+      fprintf(stderr, "%7d: Scheduling PID %7d, CPU = %7d\n", time_passed, p.process_id, p.burst_time);
+
+      //break if sim_time is up
+      if (time_passed + p.burst_time > sim_time) {
+        time_passed = sim_time;
+        fprintf(stderr, "%7d:            SIMULATION   terminated\n", time_passed);
+        break;
+      }
+      //add to running totals
+      time_passed += p.burst_time;
+      throughput += 1;
+      remaining_tasks -=1;
+      if (remaining_tasks != 0) {
+        total_wait_time += time_passed;
+      }
+
+      fprintf(stderr, "%7d:            PID %7d  terminated\n", time_passed, p.process_id);
+    }
+    //clear multimap for second set of processes with the same arrival time
+    processMultimap2.clear();
+  }
+  fprintf(stderr, "======================================\n");
+  outputStats(throughput, total_wait_time, time_passed, remaining_tasks);
 }
 
 //stores and returns process info from cin into a multimap
@@ -138,7 +189,6 @@ multimap <int, Process> mapProcessInputBy(const char *key) {
   for (int i = 1; i <= v.size(); i++) {
     if (i % 3 == 0) {
       Process p;
-      fprintf(stderr, "%d %d %d\n", v[i - 3], v[i - 2], v[i - 1]);
       p.process_id = v[i - 3];
       p.arrival_time = v[i - 2];
       p.burst_time = v[i - 1];
@@ -150,7 +200,6 @@ multimap <int, Process> mapProcessInputBy(const char *key) {
       }
     }
   }
-
   return processes;
 }
 
@@ -158,16 +207,24 @@ void outputStats(int throughput, int total_wait_time, int time_passed, int remai
   int average_wait_time;
   int average_turnaround_time;
 
+  fprintf(stderr, "Time passed       =          %7d\n", time_passed);
   fprintf(stderr, "Total Weight Time =          %7d\n", total_wait_time);
-  fprintf(stderr, "!Total Turnaround  =          %7d\n", time_passed);
+  fprintf(stderr, "Total Turnaround  =          %7d\n\n", time_passed + total_wait_time);
 
   if (throughput != 0) {
-    average_wait_time = total_wait_time / throughput;
-    average_turnaround_time = time_passed / throughput;
+    if (remaining_tasks == 0) {
+      //normal case
+      average_wait_time = total_wait_time / throughput;
+      average_turnaround_time = (time_passed + total_wait_time) / throughput;
+    } else {
+      //case where program was terminated early
+      average_wait_time = total_wait_time / (throughput + 1);
+      average_turnaround_time = (time_passed + total_wait_time) / (throughput + 1);
+    }
   }
 
   fprintf(stderr, "Throughput =          %7d\n", throughput);
   fprintf(stderr, "Avg Wait Time =       %7d\n", average_wait_time);
-  fprintf(stderr, "!Avg Turnaround Time = %7d\n", average_turnaround_time);
+  fprintf(stderr, "Avg Turnaround Time = %7d\n", average_turnaround_time);
   fprintf(stderr, "Remaining Tasks =     %7d\n", remaining_tasks);
 }
