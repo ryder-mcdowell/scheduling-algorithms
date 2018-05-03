@@ -24,7 +24,8 @@ public:
 
 void checkInputArgs(int argc, char **argv);
 Input storeInputArgs(int argc, char **argv);
-void firstComeFirstServe();
+void firstComeFirstServe(int sim_time);
+void shortestJobFirst(int sim_time);
 multimap <int, Process> mapProcessInputBy(const char *key);
 void outputStats(int throughput, int total_wait_time, int time_passed, int remaining_tasks);
 
@@ -35,10 +36,10 @@ int main(int argc, char **argv) {
   Input input = storeInputArgs(argc, argv);
 
   if (!strcmp(input.algorithm, "FCFS")) {
-    firstComeFirstServe();
+    firstComeFirstServe(input.sim_time);
   }
   if (!strcmp(input.algorithm, "SJF")) {
-
+    shortestJobFirst(input.sim_time);
   }
   if (!strcmp(input.algorithm, "RR")) {
 
@@ -80,7 +81,7 @@ Input storeInputArgs(int argc, char **argv) {
 }
 
 //first-come first-serve algorithm
-void firstComeFirstServe() {
+void firstComeFirstServe(int sim_time) {
   multimap <int, Process> processMultimap = mapProcessInputBy("arrival_time");
 
   int time_passed = 0;
@@ -88,15 +89,22 @@ void firstComeFirstServe() {
   int total_wait_time = 0;
   int remaining_tasks = processMultimap.size();
 
-  //
+  //iterate over multimap
   multimap <int, Process> :: iterator itr;
   fprintf(stderr, "======================================\n");
   for (itr = processMultimap.begin(); itr != processMultimap.end(); itr++) {
-    //
+    //get next process "in queue"
     Process p = itr->second;
     fprintf(stderr, "%7d: Scheduling PID %7d, CPU = %7d\n", time_passed, p.process_id, p.burst_time);
 
-    //
+    //break if sim_time is up
+    if (time_passed + p.burst_time > sim_time) {
+      time_passed = sim_time;
+      fprintf(stderr, "%7d:            SIMULATION   terminated\n", time_passed);
+      break;
+    }
+
+    //add to running totals
     time_passed += p.burst_time;
     throughput += 1;
     remaining_tasks -=1;
@@ -107,6 +115,11 @@ void firstComeFirstServe() {
   fprintf(stderr, "======================================\n");
 
   outputStats(throughput, total_wait_time, time_passed, remaining_tasks);
+}
+
+//shortest-job first algorithm
+void shortestJobFirst(int sim_time) {
+
 }
 
 //stores and returns process info from cin into a multimap
@@ -146,13 +159,15 @@ void outputStats(int throughput, int total_wait_time, int time_passed, int remai
   int average_turnaround_time;
 
   fprintf(stderr, "Total Weight Time =          %7d\n", total_wait_time);
-  fprintf(stderr, "Total Turnaround  =          %7d\n", time_passed);
+  fprintf(stderr, "!Total Turnaround  =          %7d\n", time_passed);
 
-  average_wait_time = total_wait_time / throughput;
-  average_turnaround_time = time_passed / throughput;
+  if (throughput != 0) {
+    average_wait_time = total_wait_time / throughput;
+    average_turnaround_time = time_passed / throughput;
+  }
 
   fprintf(stderr, "Throughput =          %7d\n", throughput);
   fprintf(stderr, "Avg Wait Time =       %7d\n", average_wait_time);
-  fprintf(stderr, "Avg Turnaround Time = %7d\n", average_turnaround_time);
+  fprintf(stderr, "!Avg Turnaround Time = %7d\n", average_turnaround_time);
   fprintf(stderr, "Remaining Tasks =     %7d\n", remaining_tasks);
 }
