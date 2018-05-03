@@ -6,6 +6,7 @@
 #include <iterator>
 #include <vector>
 #include <queue>
+#include <cstring>
 using namespace std;
 
 class Input {
@@ -26,7 +27,8 @@ void checkInputArgs(int argc, char **argv);
 Input storeInputArgs(int argc, char **argv);
 void firstComeFirstServe(int sim_time);
 void shortestJobFirst(int sim_time);
-multimap <int, Process> mapProcessInputBy(const char *key);
+void roundRobin(int sim_time, int time_slice);
+multimap <int, Process> mapProcessInput();
 void outputStats(int throughput, int total_wait_time, int time_passed, int remaining_tasks);
 
 
@@ -42,7 +44,7 @@ int main(int argc, char **argv) {
     shortestJobFirst(input.sim_time);
   }
   if (!strcmp(input.algorithm, "RR")) {
-
+    roundRobin(input.sim_time, input.time_slice);
   }
 }
 
@@ -59,6 +61,10 @@ void checkInputArgs(int argc, char **argv) {
   }
   if (strcmp(argv[2], "FCFS") && strcmp(argv[2], "SJF") && strcmp(argv[2], "RR")) {
     fprintf(stderr, "error: unrecognized algorithm type\n");
+    exit(1);
+  }
+  if (!strcmp(argv[2], "RR") && argc == 3) {
+    fprintf(stderr, "error: must provide time slice with RR algorithm type\n");
     exit(1);
   }
   if (argc == 4) {
@@ -82,12 +88,11 @@ Input storeInputArgs(int argc, char **argv) {
 
 //first-come first-serve algorithm
 void firstComeFirstServe(int sim_time) {
-  multimap <int, Process> processMultimap = mapProcessInputBy("arrival_time");
+  multimap <int, Process> processMultimap = mapProcessInput();
 
   int time_passed = 0;
   int throughput = 0;
   int total_wait_time = 0;
-  int total_turnaround_time = 0;
   int remaining_tasks = processMultimap.size();
 
   //iterate over multimap
@@ -121,7 +126,7 @@ void firstComeFirstServe(int sim_time) {
 
 //shortest-job first algorithm
 void shortestJobFirst(int sim_time) {
-  multimap <int, Process> processMultimap = mapProcessInputBy("arrival_time");
+  multimap <int, Process> processMultimap = mapProcessInput();
   multimap <int, Process> processMultimap2;
 
   int time_passed = 0;
@@ -173,8 +178,70 @@ void shortestJobFirst(int sim_time) {
   outputStats(throughput, total_wait_time, time_passed, remaining_tasks);
 }
 
+//round-robin algorithm
+void roundRobin(int sim_time, int time_slice) {
+  multimap <int, Process> processMultimap = mapProcessInput();
+  queue <Process> processQueue;
+
+  int time_passed = 0;
+  int throughput = 0;
+  int total_wait_time = 0;
+  int remaining_tasks = processMultimap.size();
+  int accumulator = 0;
+
+  //pull processes from multimap into queue
+  multimap <int, Process> :: iterator itr;
+  for (itr = processMultimap.begin(); itr != processMultimap.end(); ++itr) {
+    processQueue.push(itr->second);
+  }
+
+  //cycle until queue is empty
+  fprintf(stderr, "======================================\n");
+  while (processQueue.size() > 0) {
+    //get next in queue
+    Process p = processQueue.front();
+    fprintf(stderr, "%7d: Scheduling PID %7d, CPU = %7d\n", time_passed, p.process_id, p.burst_time);
+
+    //break if sim_time is up
+    if (time_passed + time_slice > sim_time || (time_passed + p.burst_time > sim_time && processQueue.size() == 1)) {
+      time_passed = sim_time;
+      fprintf(stderr, "%7d:            SIMULATION   terminated\n", time_passed);
+      break;
+    }
+
+    //if process won't finish before its time is up and isn't the last process
+    if (p.burst_time > time_slice && processQueue.size() > 1) {
+      //decrease remaining cpu cycles needed for completion
+      p.burst_time -= time_slice;
+      fprintf(stderr, "%7d: Suspending PID %7d, CPU = %7d\n", time_passed, p.process_id, p.burst_time);
+
+      //put on back of queue
+      processQueue.pop();
+      processQueue.push(p);
+
+      //add to running totals
+      time_passed += time_slice;
+      total_wait_time += time_slice;  //(time_slice * accumulator)?
+    } else {
+      //remove from queue
+      processQueue.pop();
+
+      //add to running totals
+      time_passed += p.burst_time;
+      throughput += 1;
+      remaining_tasks -=1;
+      total_wait_time += time_slice;  //(time_slice * accumulator)?
+
+      fprintf(stderr, "%7d:            PID %7d  terminated\n", time_passed, p.process_id);
+    }
+  }
+  fprintf(stderr, "======================================\n");
+  outputStats(throughput, total_wait_time, time_passed, remaining_tasks);
+
+}
+
 //stores and returns process info from cin into a multimap
-multimap <int, Process> mapProcessInputBy(const char *key) {
+multimap <int, Process> mapProcessInput() {
   vector <int> v;
   multimap <int, Process> processes;
 
@@ -192,12 +259,7 @@ multimap <int, Process> mapProcessInputBy(const char *key) {
       p.process_id = v[i - 3];
       p.arrival_time = v[i - 2];
       p.burst_time = v[i - 1];
-      //map based on key provided by function parameter (for different sorts based on algorithm)
-      if (!strcmp(key, "arrival_time")) {
-        processes.insert(pair <int, Process> (p.arrival_time, p));
-      } else if (!strcmp(key, "burst_time")) {
-        processes.insert(pair <int, Process> (p.burst_time, p));
-      }
+      processes.insert(pair <int, Process> (p.arrival_time, p));
     }
   }
   return processes;
@@ -217,7 +279,7 @@ void outputStats(int throughput, int total_wait_time, int time_passed, int remai
       average_wait_time = total_wait_time / throughput;
       average_turnaround_time = (time_passed + total_wait_time) / throughput;
     } else {
-      //case where program was terminated early
+      //case where simulation was terminated early
       average_wait_time = total_wait_time / (throughput + 1);
       average_turnaround_time = (time_passed + total_wait_time) / (throughput + 1);
     }
