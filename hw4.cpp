@@ -106,6 +106,9 @@ void firstComeFirstServe(int sim_time) {
     //break if sim_time is up
     if (time_passed + p.burst_time > sim_time) {
       time_passed = sim_time;
+      if (remaining_tasks != 0) {
+        total_wait_time += time_passed;
+      }
       fprintf(stderr, "%7d:            SIMULATION   terminated\n", time_passed);
       break;
     }
@@ -158,6 +161,9 @@ void shortestJobFirst(int sim_time) {
       //break if sim_time is up
       if (time_passed + p.burst_time > sim_time) {
         time_passed = sim_time;
+        if (remaining_tasks != 0) {
+          total_wait_time += (time_passed - p.arrival_time);
+        }
         fprintf(stderr, "%7d:            SIMULATION   terminated\n", time_passed);
         break;
       }
@@ -166,7 +172,7 @@ void shortestJobFirst(int sim_time) {
       throughput += 1;
       remaining_tasks -=1;
       if (remaining_tasks != 0) {
-        total_wait_time += time_passed;
+        total_wait_time += (time_passed - p.arrival_time);
       }
 
       fprintf(stderr, "%7d:            PID %7d  terminated\n", time_passed, p.process_id);
@@ -266,27 +272,27 @@ multimap <int, Process> mapProcessInput() {
 }
 
 void outputStats(int throughput, int total_wait_time, int time_passed, int remaining_tasks) {
-  int average_wait_time;
-  int average_turnaround_time;
+  float average_wait_time = 0.0;
+  float average_turnaround_time = 0.0;
 
   fprintf(stderr, "Time passed       =          %7d\n", time_passed);
-  fprintf(stderr, "Total Weight Time =          %7d\n", total_wait_time);
+  fprintf(stderr, "Total Wait Time   =          %7d\n", total_wait_time);
   fprintf(stderr, "Total Turnaround  =          %7d\n\n", time_passed + total_wait_time);
 
   if (throughput != 0) {
     if (remaining_tasks == 0) {
       //normal case
-      average_wait_time = total_wait_time / throughput;
-      average_turnaround_time = (time_passed + total_wait_time) / throughput;
+      average_wait_time = (float)total_wait_time / (float)throughput;
+      average_turnaround_time = ((float)time_passed + (float)total_wait_time) / (float)throughput;
     } else {
       //case where simulation was terminated early
-      average_wait_time = total_wait_time / (throughput + 1);
-      average_turnaround_time = (time_passed + total_wait_time) / (throughput + 1);
+      average_wait_time = (float)total_wait_time / ((float)throughput + 1);
+      average_turnaround_time = ((float)time_passed + (float)total_wait_time) / ((float)throughput);
     }
   }
 
-  fprintf(stderr, "Throughput =          %7d\n", throughput);
-  fprintf(stderr, "Avg Wait Time =       %7d\n", average_wait_time);
-  fprintf(stderr, "Avg Turnaround Time = %7d\n", average_turnaround_time);
-  fprintf(stderr, "Remaining Tasks =     %7d\n", remaining_tasks);
+  fprintf(stderr, "Throughput =          %10d\n", throughput);
+  fprintf(stderr, "Avg Wait Time =       %10f\n", average_wait_time);
+  fprintf(stderr, "Avg Turnaround Time = %10f\n", average_turnaround_time);
+  fprintf(stderr, "Remaining Tasks =     %10d\n", remaining_tasks);
 }
