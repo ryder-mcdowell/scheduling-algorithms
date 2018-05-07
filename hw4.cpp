@@ -96,19 +96,29 @@ void firstComeFirstServe(int sim_time) {
   int total_wait_time = 0;
   int remaining_tasks = processMultimap.size();
 
+  //initialize previous process
+  Process previous;
+  previous.burst_time = 0;
+
   //iterate over multimap
   multimap <int, Process> :: iterator itr;
   fprintf(stderr, "======================================\n");
   for (itr = processMultimap.begin(); itr != processMultimap.end(); itr++) {
     //get next process "in queue"
     Process p = itr->second;
+
+    //if arrived after previous was done executing
+    if (time_passed <= p.arrival_time){
+      time_passed = p.arrival_time;
+      total_wait_time -= previous.burst_time;
+    }
     fprintf(stderr, "%7d: Scheduling PID %7d, CPU = %7d\n", time_passed, p.process_id, p.burst_time);
 
     //break if sim_time is up
     if (time_passed + p.burst_time > sim_time) {
       time_passed = sim_time;
-      if (remaining_tasks != 0) {
-        total_wait_time += time_passed;
+      if (remaining_tasks > 1) {
+        total_wait_time += (time_passed - p.arrival_time);
       }
       fprintf(stderr, "%7d:            SIMULATION   terminated\n", time_passed);
       break;
@@ -119,84 +129,79 @@ void firstComeFirstServe(int sim_time) {
     throughput += 1;
     remaining_tasks -=1;
     if (remaining_tasks != 0) {
-      total_wait_time += time_passed;
+      total_wait_time += (time_passed - p.arrival_time);
     }
 
     fprintf(stderr, "%7d:            PID %7d  terminated\n", time_passed, p.process_id);
+    previous = p;
   }
   fprintf(stderr, "======================================\n");
+
   outputStats(throughput, total_wait_time, time_passed, remaining_tasks);
 }
 
 //shortest-job first algorithm
 void shortestJobFirst(int sim_time) {
   multimap <int, Process> processMultimap = mapProcessInput();
-  multimap <int, Process> processMultimap2;
 
   int time_passed = 0;
   int throughput = 0;
   int total_wait_time = 0;
   int remaining_tasks = processMultimap.size();
 
-  //iterate over multimap
-  multimap <int, Process> :: iterator itr;
-  multimap <int, Process> :: iterator itr2;
-  fprintf(stderr, "======================================\n");
-  //for (itr = processMultimap.begin(); itr != processMultimap.end(); itr++) {
-  while (processMultimap.size() > 0) {
-    // Process p = itr->second;
-    // processMultimap2.insert(pair <int, Process> (p.burst_time, p));
-    //
-    // //add all the processes in the first multimap that have the same arrival_time into a second multimap
-    // for (int i = 0; i < processMultimap.count(p.arrival_time) - 1; i++) {
-    //   itr++;
-    //   Process p = itr->second;
-    //   processMultimap2.insert(pair <int, Process> (p.burst_time, p));
-    // }
+  //initialize previous process
+  Process previous;
+  previous.burst_time = 0;
 
-    Process next = processMultimap.begin()->second;
+  //go until no more jobs left
+  multimap <int, Process> :: iterator itr;
+  fprintf(stderr, "======================================\n");
+  while (processMultimap.size() > 0) {
+    Process p = processMultimap.begin()->second;
     multimap <int, Process> :: iterator itemToDelete = processMultimap.begin();
 
+    //find next shortest job
+    Process tmp;
     for (itr = processMultimap.begin(); itr != processMultimap.end(); itr++) {
-      Process p = itr->second;
-      if (p.burst_time < next.burst_time && p.arrival_time < time_passed) {
-        next = p;
+      tmp = itr->second;
+      if (tmp.burst_time < p.burst_time && tmp.arrival_time < time_passed) {
+        p = tmp;
         itemToDelete = itr;
       }
     }
 
-    processMultimap2.insert(pair <int, Process> (next.burst_time, next));
+    //delete element being scheduled
     processMultimap.erase(itemToDelete);
 
-    //iterate over all elements in second multimap
-    for (itr2 = processMultimap2.begin(); itr2 != processMultimap2.end(); itr2++) {
-      //get next process "in queue"
-      Process p = itr2->second;
-      fprintf(stderr, "%7d: Scheduling PID %7d, CPU = %7d\n", time_passed, p.process_id, p.burst_time);
+    //if arrived after previous was done executing
+    if (time_passed <= p.arrival_time){
+      time_passed = p.arrival_time;
+      total_wait_time -= previous.burst_time;
+    }
+    fprintf(stderr, "%7d: Scheduling PID %7d, CPU = %7d\n", time_passed, p.process_id, p.burst_time);
 
-      //break if sim_time is up
-      if (time_passed + p.burst_time > sim_time) {
-        time_passed = sim_time;
-        if (remaining_tasks != 0) {
-          total_wait_time += (time_passed - p.arrival_time);
-        }
-        fprintf(stderr, "%7d:            SIMULATION   terminated\n", time_passed);
-        break;
-      }
-      //add to running totals
-      time_passed += p.burst_time;
-      throughput += 1;
-      remaining_tasks -=1;
-      if (remaining_tasks != 0) {
+    //break if sim_time is up
+    if (time_passed + p.burst_time > sim_time) {
+      time_passed = sim_time;
+      if (remaining_tasks > 1) {
         total_wait_time += (time_passed - p.arrival_time);
       }
-
-      fprintf(stderr, "%7d:            PID %7d  terminated\n", time_passed, p.process_id);
+      fprintf(stderr, "%7d:            SIMULATION   terminated\n", time_passed);
+      break;
     }
-    //clear multimap for second set of processes with the same arrival time
-    processMultimap2.clear();
+
+    //add to running totals
+    time_passed += p.burst_time;
+    throughput += 1;
+    remaining_tasks -=1;
+    if (remaining_tasks != 0) {
+      total_wait_time += (time_passed - p.arrival_time);
+    }
+    fprintf(stderr, "%7d:            PID %7d  terminated\n", time_passed, p.process_id);
+    previous = p;
   }
   fprintf(stderr, "======================================\n");
+
   outputStats(throughput, total_wait_time, time_passed, remaining_tasks);
 }
 
@@ -209,6 +214,12 @@ void roundRobin(int sim_time, int time_slice) {
   int throughput = 0;
   int total_wait_time = 0;
   int remaining_tasks = processMultimap.size();
+  int initial_size = processMultimap.size();
+  int counter = 0;
+
+  //initialize previous process
+  Process previous;
+  previous.burst_time = 0;
 
   //pull processes from multimap into queue
   multimap <int, Process> :: iterator itr;
@@ -221,6 +232,19 @@ void roundRobin(int sim_time, int time_slice) {
   while (processQueue.size() > 0) {
     //get next in queue
     Process p = processQueue.front();
+
+    //if arrived after previous was done executing
+    if (time_passed <= p.arrival_time && time_passed != 0 && counter < initial_size){
+      //put on back of queue
+      counter += 1;
+      processQueue.pop();
+      processQueue.push(p);
+      continue;
+    }
+    counter = 0;
+    if (time_passed <= p.arrival_time){
+      time_passed = p.arrival_time;
+    }
     fprintf(stderr, "%7d: Scheduling PID %7d, CPU = %7d\n", time_passed, p.process_id, p.burst_time);
 
     //break if sim_time is up
@@ -266,8 +290,10 @@ void roundRobin(int sim_time, int time_slice) {
 
       fprintf(stderr, "%7d:            PID %7d  terminated\n", time_passed, p.process_id);
     }
+    previous = p;
   }
   fprintf(stderr, "======================================\n");
+
   outputStats(throughput, total_wait_time, time_passed, remaining_tasks);
 }
 
